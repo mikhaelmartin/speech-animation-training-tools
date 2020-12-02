@@ -2,12 +2,14 @@ import os
 import csv
 import vpython as vp
 
+input_mfcc_dir = "../mfcc/"
+
 ground_def_file = open("../video/ground_def.csv")
-input_dir = "../openface_output/"
+openface_dir = "../openface_output/"
 output_dir = (
-    "/home/alkhemi/Documents/thesis/Speech Animation Test/Assets/data/"
+    "../data/"
 )
-# output_dir = "../"
+selected_mfcc_dir = output_dir+"0.mfcc/"
 transformed_dir = output_dir + "1.transformed/"
 symmetric_dir = output_dir + "2.symmetric/"
 sliced_dir = output_dir + "3.sliced/"
@@ -126,11 +128,16 @@ def write_data_file_single_row(csv_file_loc, data_row):
     myFile.close()
 
 
-if not os.path.exists(input_dir):
-    print("input folder does not exists")
+if not os.path.exists(input_mfcc_dir):
+    print("mfcc folder does not exists")
+    exit()
+if not os.path.exists(openface_dir):
+    print("openface folder does not exists")
     exit()
 if not os.path.exists(output_dir):
     os.mkdir(output_dir)
+if not os.path.exists(selected_mfcc_dir):
+    os.mkdir(selected_mfcc_dir)
 if not os.path.exists(transformed_dir):
     os.mkdir(transformed_dir)
 if not os.path.exists(symmetric_dir):
@@ -143,7 +150,7 @@ if not os.path.exists(model_data_dir):
     os.mkdir(model_data_dir)
 
 
-filename_list = [item for item in os.listdir(input_dir) if (".csv" in item)]
+filename_list = [item for item in os.listdir(openface_dir) if (".csv" in item)]
 
 # create ground frame dictionary
 ground_dict = dict()
@@ -155,20 +162,32 @@ for row in csv_reader:
 
 # data processing
 for file in filename_list:
-    with open(input_dir + file) as csv_file:
-        csv_reader = csv.reader(csv_file, delimiter=",")
-        row1 = next(csv_reader)
-        headpos_index = row1.index("pose_Tx")
-        pos_index = row1.index("X_0")
-        transformed_pos = list(list())
-        symmetric_pos = list(list())
-        sliced_pos = list(list())
-        ground_row = list()
-        model_data_pos = list(list())
-        frame_index = 0
+    csv_mfcc = csv.reader(
+            open(input_mfcc_dir + file[:-4]+"_mfcc.csv"), delimiter=",")
+    mfcc_rows = list(list())
+    for row in csv_mfcc:
+        mfcc_rows.append(row)
 
-        # get sliced position data and ground
-        for row in csv_reader:
+    csv_openface = csv.reader(open(openface_dir + file), delimiter=",")
+    row1 = next(csv_openface)
+    success_index = row1.index("success")
+    headpos_index = row1.index("pose_Tx")
+    pos_index = row1.index("X_0")
+    mfcc = list(list())
+    transformed_pos = list(list())
+    symmetric_pos = list(list())
+    sliced_pos = list(list())
+    ground_row = list()
+    model_data_pos = list(list())
+    frame_index = 0
+
+    # get sliced position data and ground
+    for index, row in enumerate(csv_openface):
+        # print(float(row[confidence_index]))
+        if float(row[success_index]) == 1:
+            # print(mfcc_rows[index])
+            mfcc.append(mfcc_rows[index])
+
             # get transformed data, facing the camera
             pos_row = get_tranformed_data(row, headpos_index, pos_index)
 
@@ -188,38 +207,46 @@ for file in filename_list:
             sliced_pos.append(sliced_pos_row)
 
             # if this frame is the ground_truth
-            if frame_index == ground_dict[file[:-4]]:
-                ground_row = sliced_pos_row
+            if file[:-4] in ground_dict:
+                if frame_index == ground_dict[file[:-4]]:
+                    ground_row = sliced_pos_row
+            else:
+                if frame_index == 0:
+                    ground_row = sliced_pos_row
 
             # next frame
             frame_index += 1
 
-        # get model data
-        for sliced_row in sliced_pos:
-            model_data_row = list()
-            for index in range(len(sliced_row)):
-                model_data_row.append(
-                    str(float(sliced_row[index]) - float(ground_row[index]))
-                )
-            model_data_pos.append(model_data_row)
+    # get model data
+    for sliced_row in sliced_pos:
+        model_data_row = list()
+        for index in range(len(sliced_row)):
+            model_data_row.append(
+                str(float(sliced_row[index]) - float(ground_row[index]))
+            )
+        model_data_pos.append(model_data_row)
 
-        # save files
-        write_data_file(
-            transformed_dir + file[:-4] + "_pos.csv", transformed_pos
-        )
+    # save files
+    write_data_file(
+        selected_mfcc_dir + file[:-4] + "_mfcc.csv", mfcc
+    )
 
-        write_data_file(
-            symmetric_dir + file[:-4] + "_symmetric.csv", symmetric_pos
-        )
+    write_data_file(
+        transformed_dir + file[:-4] + "_pos.csv", transformed_pos
+    )
 
-        write_data_file(sliced_dir + file[:-4] + "_sliced.csv", sliced_pos)
+    write_data_file(
+        symmetric_dir + file[:-4] + "_symmetric.csv", symmetric_pos
+    )
 
-        write_data_file_single_row(
-            ground_dir + file[:-4] + "_ground.csv", ground_row
-        )
+    write_data_file(sliced_dir + file[:-4] + "_sliced.csv", sliced_pos)
 
-        write_data_file(
-            model_data_dir + file[:-4] + "_model_data.csv", model_data_pos
-        )
+    write_data_file_single_row(
+        ground_dir + file[:-4] + "_ground.csv", ground_row
+    )
 
-        # print("train_pos", len(training_pos[0]))
+    write_data_file(
+        model_data_dir + file[:-4] + "_model_data.csv", model_data_pos
+    )
+
+    # print("train_pos", len(training_pos[0]))

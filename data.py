@@ -1,6 +1,7 @@
 import os
 import pandas as pd
 import vpython as vp
+import multiprocessing as multi
 
 
 def get_tranformed_data(row):
@@ -23,6 +24,31 @@ def get_tranformed_data(row):
     return row
 
 
+def process_data(filename):
+    print("processing " + filename)
+    df = pd.read_csv(raw_data_dir + filename)
+    # transform data so the face facing the camera
+    for row_index, row in df.iterrows():
+        df.loc[row_index] = get_tranformed_data(row)
+        if row_index == 0:
+            ground = df.loc[0]
+        else:
+            for i in range(68):
+                for axis in list(["X_", "Y_", "Z_"]):
+                    df.loc[row_index, axis + str(i)] = float(
+                        row[axis + str(i)]
+                    ) - float(ground[axis + str(i)])
+    df.pop("pose_Tx")
+    df.pop("pose_Ty")
+    df.pop("pose_Tz")
+    df.pop("pose_Rx")
+    df.pop("pose_Ry")
+    df.pop("pose_Rz")
+    df.to_csv(output_data_dir + filename, index=False)
+
+
+print("number of Processors: ", multi.cpu_count())
+
 raw_data_dir = "../raw_data/"
 output_data_dir = "../data/"
 if not os.path.exists(raw_data_dir):
@@ -35,24 +61,7 @@ raw_data_filenames = [
     file for file in os.listdir(raw_data_dir) if file[-4:] == ".csv"
 ]
 
-for filename in raw_data_filenames:
-    print("processing " + filename)
-    df = pd.read_csv(raw_data_dir + filename)
-    # transform data so the face facing the camera
-    for row_index, row in df.iterrows():
-        df.loc[row_index] = get_tranformed_data(row)
-        if row_index == 0:
-            ground = df.loc[0]
-        for i in range(68):
-            for axis in list(["X_", "Y_", "Z_"]):
-                new_value = float(row[axis + str(i)]) - float(
-                    ground[axis + str(i)]
-                )
-                df.loc[row_index, axis + str(i)] = new_value
-    df.pop("pose_Tx")
-    df.pop("pose_Ty")
-    df.pop("pose_Tz")
-    df.pop("pose_Rx")
-    df.pop("pose_Ry")
-    df.pop("pose_Rz")
-    df.to_csv(output_data_dir + filename, index=False)
+if __name__ == "__main__":
+    pool = multi.Pool()
+    process_async = pool.map_async(process_data, raw_data_filenames)
+    process_async.get()

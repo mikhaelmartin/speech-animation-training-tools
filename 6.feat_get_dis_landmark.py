@@ -4,9 +4,6 @@ import pandas as pd
 from numpy import round
 import time
 
-source_frame_length = 0.00004  # audio file 25kHz
-target_frame_length = 0.02
-
 features_dir = "../features/"
 
 if not os.path.exists(features_dir):

@@ -6,7 +6,7 @@ from statistics import mean
 import time
 
 source_frame_length = 0.00004  # audio file 25kHz
-target_frame_length = 0.02
+target_frame_length = 1/60  #0.02
 
 features_dir = "../features/"
 

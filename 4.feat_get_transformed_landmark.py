@@ -9,9 +9,9 @@ import pandas as pd
 import vpython as vp
 import numpy as np
 import time
-
+from math import floor
 # target frame length
-frame_length = 0.02  # 20ms
+target_frame_length = 1 / 60  # 0.02  # 20ms
 
 openface_dir = "../openface/"
 features_dir = "../features/"
@@ -41,51 +41,52 @@ def get_tranformed_data(row):
 
 def process_landmarks(speaker, filename):
     print("processing", speaker, filename)
-    df = pd.read_csv(openface_dir + speaker + "/" +
-                     filename, skipinitialspace=True)
+    df = pd.read_csv(openface_dir + speaker + "/" + filename, skipinitialspace=True)
     # transform data so the face facing the camera
     for row_index, row in df.iterrows():
         df.loc[row_index] = get_tranformed_data(row)
 
     functions = {}
     functions["confidence"] = scipy.interpolate.interp1d(
-        [float(item) for item in df["frame"]],
+        [float(item) for item in df["timestamp"]],
         [float(item) for item in df["confidence"]],
-        kind="linear")
+        kind="linear",
+    )
     functions["success"] = scipy.interpolate.interp1d(
-        [int(item) for item in df["frame"]],
+        [float(item) for item in df["timestamp"]],
         [int(item) for item in df["success"]],
-        kind="previous")
+        kind="previous",
+    )
     axis_names = []
     for axis in ["X_", "Y_", "Z_"]:
         for i in range(68):
-            axis_names.append(axis+str(i))
-            functions[axis+str(i)] = scipy.interpolate.interp1d(
-                [float(item) for item in df["frame"]],
-                [float(item) for item in df[axis+str(i)]],
-                kind="cubic")
+            axis_names.append(axis + str(i))
+            functions[axis + str(i)] = scipy.interpolate.interp1d(
+                [float(item) for item in df["timestamp"]],
+                [float(item) for item in df[axis + str(i)]],
+                kind="cubic",
+            )
     face_id = int(df.loc[0, "face_id"])
 
+    timestamp_bound = df.loc[len(df) - 1, "timestamp"]
+    length = round(timestamp_bound / target_frame_length)
     new_df = pd.DataFrame()
-    new_df["frame"] = [(i + 1) for i in range(len(df)*2-1)]
-    new_df["face_id"] = [(face_id) for i in range(len(df)*2-1)]
-    new_df["timestamp"] = [round(i*frame_length, 2)
-                           for i in range(len(df)*2-1)]
-    new_df["confidence"] = [
-        (functions["confidence"](1+i*0.5)) for i in range(len(df)*2-1)]
-    new_df["success"] = [
-        (int(functions["success"](1+i*0.5))) for i in range(len(df)*2-1)]
+    new_df["frame"] = [(i + 1) for i in range(length)]
+    new_df["face_id"] = [(face_id) for i in range(length)]
+    new_df["timestamp"] = [round(i * target_frame_length, 4) for i in range(length)]
+    new_df["confidence"] = [(functions["confidence"](x)) for x in new_df["timestamp"]]
+    new_df["success"] = [int(functions["success"](x)) for x in new_df["timestamp"]]
     for axis in ["X_", "Y_", "Z_"]:
         for j in range(68):
-            new_df[axis+str(j)] = [
-                np.round(functions[
-                    axis+str(j)](1+i*0.5), 3) for i in range(len(df)*2-1)]
-    new_df.to_csv(features_dir + speaker +
-                  "/landmarks/" + filename, index=False)
+            new_df[axis + str(j)] = [
+                np.round(functions[axis + str(j)](x), 3) for x in new_df["timestamp"]
+            ]
+    new_df.to_csv(features_dir + speaker + "/landmarks/" + filename, index=False)
 
 
-speaker_list = [item for item in os.listdir(
-    openface_dir) if os.path.isdir(openface_dir + item)]
+speaker_list = [
+    item for item in os.listdir(openface_dir) if os.path.isdir(openface_dir + item)
+]
 speaker_list.sort()
 print(speaker_list)
 
@@ -95,21 +96,22 @@ if __name__ == "__main__":
     for speaker in speaker_list:
         # print("Processing " + speaker)
         if not os.path.exists(features_dir + speaker):
-            os.mkdir(features_dir+speaker)
+            os.mkdir(features_dir + speaker)
         if not os.path.exists(features_dir + speaker + "/landmarks"):
             os.mkdir(features_dir + speaker + "/landmarks")
 
-        raw_openface_list = [item for item in os.listdir(
-            openface_dir+speaker) if item[-4:] == ".csv"]
+        raw_openface_list = [
+            item for item in os.listdir(openface_dir + speaker) if item[-4:] == ".csv"
+        ]
 
         pool = multiprocessing.Pool()
 
         # dari openface ambil landmark taro di folder landmark
         pool.starmap(
             process_landmarks,
-            zip([speaker]*len(raw_openface_list), raw_openface_list)
+            zip([speaker] * len(raw_openface_list), raw_openface_list),
         )
         pool.close()
         pool.join()
-    print("finished in", time.time()-start_time, "seconds")
+    print("finished in", time.time() - start_time, "seconds")
     exit()

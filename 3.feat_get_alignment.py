@@ -6,7 +6,7 @@ from numpy import round
 import time
 
 source_frame_length = 0.00004  # audio file 25kHz
-target_frame_length = 0.02
+target_frame_length = 1/60    #0.02
 
 alignment_dir = "../alignment/"
 features_dir = "../features/"
@@ -40,7 +40,7 @@ def create_align_csv(speaker, align_filename):
                 data_dict[frame] = {
                     "frame": frame+1,
                     "timestamp":
-                    round(target_frame_length*frame, decimals=2),
+                    round(target_frame_length*frame, decimals=4),
                     "word": align_dict_list[i][2]
                 }
                 break

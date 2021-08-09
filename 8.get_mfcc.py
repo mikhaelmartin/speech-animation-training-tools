@@ -29,6 +29,7 @@ def librosa_mfcc_extract(speaker, audio_file_name):
         window="hann",
         htk=True,
     )
+    # delta features from librosa are computed Savitsky-Golay filtering
     delta_MFCCs = librosa.feature.delta(MFCCs)
     delta2_MFCCs = librosa.feature.delta(MFCCs, order=2)
     MFCCs = MFCCs.transpose()

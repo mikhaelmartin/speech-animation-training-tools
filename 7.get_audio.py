@@ -10,10 +10,10 @@ import time
 # import matplotlib.pyplot as plt
 # from scipy.signal import sosfreqz
 
-# video_dir = "../video/"
 video_dir = "../video/"
 audio_dir = "../audio/"
 audio_filtered_dir = "../audio_filtered/"
+
 
 if not os.path.exists(audio_dir):
     os.mkdir(audio_dir)
@@ -58,7 +58,7 @@ def wav_extract(speaker, video):
             audio_filtered_dir + speaker + "/" + video.split(".")[-2] +
             ".wav", rate=fs, data=audio_array)
     except Exception as e:
-        raise Exception(e.message)
+        raise e  
 
 
 # video is put inside folder for each speaker
@@ -71,11 +71,11 @@ speaker_list.sort()
 print("getting audio")
 if __name__ == "__main__":
     start_time = time.time()
-    for speaker in speaker_list:
+    for speaker in speaker_list[2:3]:
 
         print("processing " + speaker)
-        # if not os.path.exists(audio_dir + speaker):
-        #     os.mkdir(audio_dir + speaker)
+        if not os.path.exists(audio_dir + speaker):
+            os.mkdir(audio_dir + speaker)
         if not os.path.exists(audio_filtered_dir + speaker):
             os.mkdir(audio_filtered_dir + speaker)
 
@@ -97,9 +97,9 @@ if __name__ == "__main__":
 
             )
         except Exception as e:
-            print(e.message)
             pool.close()
             pool.join()
+            raise e
         pool.close()
         pool.join()
     print("finished in", time.time()-start_time, "seconds")
